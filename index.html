@@ -140,6 +140,33 @@
 
       <!-- TAB 2: BOSS ORDER MANAGEMENT -->
       <section id="viewOrders" class="hidden space-y-3.5">
+        <!-- Google Sheets Cloud Backend Config -->
+        <div class="bg-white rounded-2xl p-3.5 border border-[#EFE3D3] space-y-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-[#29180D] flex items-center gap-1.5">
+              <i data-lucide="sheet" class="w-4 h-4 text-emerald-600"></i>
+              Google 試算表雲端串接
+            </span>
+            <button id="btnCopyGasCode" type="button" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
+              複製 Apps Script 程式碼
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="gasUrlInput" type="url" placeholder="貼上 Google Apps Script 部署網址 (https://script.google.com/...)" class="flex-1 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-700 outline-none focus:border-emerald-500" />
+            <button id="btnSaveGasUrl" type="button" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold shrink-0">綁定</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnSyncFromSheet" type="button" class="flex-1 py-2 rounded-xl bg-[#F2E9DC] hover:bg-[#EADBC8] text-[#29180D] text-xs font-bold flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              從試算表同步訂單
+            </button>
+            <button id="btnCopyCustomerLink" type="button" class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="link" class="w-3.5 h-3.5"></i>
+              複製客人點餐網址
+            </button>
+          </div>
+        </div>
+
         <div class="bg-white rounded-2xl p-3 border border-[#EFE3D3] flex items-center gap-2">
           <i data-lucide="message-circle" class="w-4 h-4 text-[#06C755] shrink-0"></i>
           <input id="lineOaInput" type="text" placeholder="選填：輸入你的 LINE 官方帳號 ID（如 @123abc）可指定直接傳給你" class="flex-1 text-xs text-slate-700 outline-none bg-transparent" />
@@ -218,7 +245,7 @@
     <!-- Order Confirmation Modal (with LINE message copy) -->
     <div id="orderDoneModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end md:items-center justify-center p-0 md:p-4">
       <div class="w-full max-w-[440px] bg-white rounded-t-[28px] md:rounded-[28px] p-5 shadow-2xl slide-up">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-2">
           <h3 class="text-base font-bold text-[#29180D] flex items-center gap-2">
             <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>
             訂單已建立
@@ -227,6 +254,7 @@
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
+        <p id="cloudSyncStatus" class="hidden text-xs font-semibold px-3 py-1.5 rounded-xl mb-3"></p>
         <pre id="lineMessagePreview" class="text-xs text-slate-700 bg-[#FAF6EE] border border-[#EADBC8] rounded-2xl p-3.5 whitespace-pre-wrap font-sans leading-relaxed mb-4"></pre>
         <div class="space-y-2">
           <a id="btnSendViaLine" href="#" target="_blank" rel="noopener noreferrer" class="w-full py-3 rounded-2xl bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition">
@@ -262,6 +290,68 @@
     (function () {
       const STORAGE_KEY = 'hk_crepe_weekend_v2';
       const LINE_OA_KEY = 'hk_crepe_line_oa_v1';
+      const GAS_URL_KEY = 'hk_crepe_gas_url_v1';
+
+      const APPS_SCRIPT_CODE = `function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['訂單編號', '建立時間', '取餐日', '取餐時段', '稱呼', '品項明細', '備註', '總金額', '狀態', 'itemsJSON']);
+  }
+  var data = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    data.id,
+    new Date(data.createdAt).toLocaleString('zh-TW'),
+    data.day,
+    data.slot,
+    data.customer,
+    data.itemsText,
+    data.note || '',
+    data.total,
+    '待製作',
+    JSON.stringify(data.items)
+  ]);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var rows = sheet.getDataRange().getValues();
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0]) continue;
+    var itemsObj = {};
+    try { itemsObj = JSON.parse(r[9] || '{}'); } catch (err) {}
+    list.push({
+      id: String(r[0]),
+      day: String(r[2]),
+      slot: String(r[3]),
+      customer: String(r[4]),
+      note: String(r[6] || ''),
+      total: Number(r[7] || 0),
+      status: String(r[8]) === '已取餐' ? 'done' : 'pending',
+      items: itemsObj,
+      createdAt: new Date(r[1]).getTime() || Date.now()
+    });
+  }
+  return ContentService.createTextOutput(JSON.stringify({ orders: list.reverse() }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+      function getGasUrl() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const apiParam = params.get('api');
+          if (apiParam && apiParam.startsWith('https://')) {
+            localStorage.setItem(GAS_URL_KEY, apiParam.trim());
+            return apiParam.trim();
+          }
+          return (localStorage.getItem(GAS_URL_KEY) || '').trim();
+        } catch (e) {
+          return '';
+        }
+      }
 
       const MENU = [
         { id: 'choco', type: 'crepe', name: '巧克力', desc: '經典單醬 · 香甜濃郁巧克力醬', price: 45, tag: '經典單醬', allergen: '蛋、奶、麩質' },
@@ -674,6 +764,33 @@
           : `https://line.me/R/share?text=${encodedMsg}`;
         document.getElementById('btnSendViaLine').href = lineUrl;
         document.getElementById('lineMessagePreview').textContent = msg;
+
+        const gasUrl = getGasUrl();
+        const statusEl = document.getElementById('cloudSyncStatus');
+        if (gasUrl && gasUrl.startsWith('https://')) {
+          statusEl.className = 'text-xs font-semibold px-3 py-1.5 rounded-xl mb-3 bg-amber-50 text-amber-800';
+          statusEl.textContent = '⏳ 正在同步寫入老闆的 Google 試算表...';
+          statusEl.classList.remove('hidden');
+          const itemsText = entries.map(([id, q]) => {
+            const m = MENU.find(x => x.id === id);
+            return m ? `${m.name}×${q}` : '';
+          }).filter(Boolean).join('、');
+          fetch(gasUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ ...newOrd, itemsText })
+          }).then(() => {
+            statusEl.className = 'text-xs font-semibold px-3 py-1.5 rounded-xl mb-3 bg-emerald-50 text-emerald-700';
+            statusEl.textContent = '✅ 已自動寫入雲端 Google 試算表！';
+          }).catch(() => {
+            statusEl.className = 'text-xs font-semibold px-3 py-1.5 rounded-xl mb-3 bg-rose-50 text-rose-700';
+            statusEl.textContent = '⚠️ 雲端寫入失敗，請改用下方 LINE 傳送訂單';
+          });
+        } else {
+          statusEl.classList.add('hidden');
+        }
+
         document.getElementById('orderDoneModal').classList.remove('hidden');
 
         state.cart = {};
@@ -762,6 +879,52 @@
         const savedOa = localStorage.getItem(LINE_OA_KEY) || '';
         document.getElementById('lineOaInput').value = savedOa;
       } catch (e) {}
+      document.getElementById('gasUrlInput').value = getGasUrl();
+      document.getElementById('btnCopyGasCode').addEventListener('click', () => {
+        copyText(APPS_SCRIPT_CODE, '已複製 Apps Script 程式碼！請貼到試算表的擴充功能');
+      });
+      document.getElementById('btnSaveGasUrl').addEventListener('click', () => {
+        const val = document.getElementById('gasUrlInput').value.trim();
+        if (val && !val.startsWith('https://script.google.com/')) {
+          showToast('請貼上正確的 https://script.google.com/... 部署網址');
+          return;
+        }
+        try { localStorage.setItem(GAS_URL_KEY, val); } catch (e) {}
+        showToast(val ? '已綁定 Google 試算表網址' : '已清除試算表綁定');
+      });
+      document.getElementById('btnCopyCustomerLink').addEventListener('click', () => {
+        const gasUrl = getGasUrl();
+        const base = window.location.href.split('?')[0];
+        if (!gasUrl) {
+          showToast('請先綁定 Google Apps Script 網址再複製連結');
+          return;
+        }
+        const shareUrl = `${base}?api=${encodeURIComponent(gasUrl)}`;
+        copyText(shareUrl, '已複製專屬客人點餐網址（含雲端寫入）！');
+      });
+      document.getElementById('btnSyncFromSheet').addEventListener('click', async () => {
+        const gasUrl = getGasUrl();
+        if (!gasUrl) {
+          showToast('請先貼上並綁定 Apps Script 網址');
+          return;
+        }
+        showToast('正在從試算表讀取最新訂單...');
+        try {
+          const res = await fetch(gasUrl);
+          const data = await res.json();
+          if (Array.isArray(data.orders)) {
+            state.orders = data.orders;
+            saveState();
+            render();
+            showToast(`已同步 ${data.orders.length} 筆雲端訂單`);
+          } else {
+            showToast('試算表目前沒有訂單資料');
+          }
+        } catch (err) {
+          showToast('無法讀取試算表，請確認部署權限已設為「所有人」');
+        }
+      });
+
       document.getElementById('btnSaveLineOa').addEventListener('click', () => {
         const val = document.getElementById('lineOaInput').value.trim();
         try { localStorage.setItem(LINE_OA_KEY, val); } catch (e) {}
