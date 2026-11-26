@@ -45,8 +45,8 @@
 
     <!-- Header -->
     <header class="bg-white/90 backdrop-blur-md border-b border-[#EFE3D3] px-4 pt-4 pb-3 sticky top-0 z-20">
-      <div class="flex items-center justify-between gap-2 mb-3">
-        <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div id="brandSecretTrigger" class="flex items-center gap-2.5 cursor-pointer select-none">
           <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-sm text-lg">
             🥞
           </div>
@@ -55,13 +55,13 @@
             <p class="text-[11px] text-amber-800/80 font-medium">週末限定預購 · 週六、週日到點現煎</p>
           </div>
         </div>
-        <button id="btnResetOrders" type="button" title="清空所有訂單" class="p-2 rounded-xl text-amber-900/60 hover:bg-amber-100/60 transition">
+        <button id="btnResetOrders" type="button" title="清空所有訂單" class="hidden p-2 rounded-xl text-amber-900/60 hover:bg-amber-100/60 transition">
           <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
         </button>
       </div>
 
-      <!-- Mode Switcher: Order Form vs Boss Prep -->
-      <div class="grid grid-cols-3 gap-1 bg-[#F2E9DC] p-1 rounded-2xl text-xs font-bold">
+      <!-- Mode Switcher: Order Form vs Boss Prep (Boss only) -->
+      <div id="topTabBar" class="hidden grid grid-cols-3 gap-1 bg-[#F2E9DC] p-1 rounded-2xl text-xs font-bold mt-2">
         <button data-tab="order" type="button" class="top-tab py-2 rounded-xl bg-white text-[#29180D] shadow-xs transition">
           點餐預訂
         </button>
@@ -155,15 +155,21 @@
             <input id="gasUrlInput" type="url" placeholder="貼上 Google Apps Script 部署網址 (https://script.google.com/...)" class="flex-1 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-700 outline-none focus:border-emerald-500" />
             <button id="btnSaveGasUrl" type="button" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold shrink-0">綁定</button>
           </div>
-          <div class="flex items-center gap-2">
-            <button id="btnSyncFromSheet" type="button" class="flex-1 py-2 rounded-xl bg-[#F2E9DC] hover:bg-[#EADBC8] text-[#29180D] text-xs font-bold flex items-center justify-center gap-1.5 transition">
+          <div class="space-y-2">
+            <button id="btnSyncFromSheet" type="button" class="w-full py-2 rounded-xl bg-[#F2E9DC] hover:bg-[#EADBC8] text-[#29180D] text-xs font-bold flex items-center justify-center gap-1.5 transition">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
               從試算表同步訂單
             </button>
-            <button id="btnCopyCustomerLink" type="button" class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition">
-              <i data-lucide="link" class="w-3.5 h-3.5"></i>
-              複製客人點餐網址
-            </button>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="btnCopyCustomerLink" type="button" class="py-2 px-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition">
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+                複製客人網址(無後台)
+              </button>
+              <button id="btnCopyBossLink" type="button" class="py-2 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition">
+                <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+                複製老闆網址(含後台)
+              </button>
+            </div>
           </div>
         </div>
 
@@ -275,6 +281,7 @@
       const STORAGE_KEY = 'hk_crepe_weekend_v2';
       const LINE_OA_KEY = 'hk_crepe_line_oa_v1';
       const GAS_URL_KEY = 'hk_crepe_gas_url_v1';
+      const BOSS_KEY = 'hk_crepe_boss_v1';
 
       const APPS_SCRIPT_CODE = `function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -370,7 +377,24 @@ function doGet(e) {
         return [];
       }
 
+      function detectBossMode() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('boss') === '1') {
+            localStorage.setItem(BOSS_KEY, '1');
+            return true;
+          }
+          if (params.get('mode') === 'customer') {
+            return false;
+          }
+          return localStorage.getItem(BOSS_KEY) === '1';
+        } catch (e) {
+          return false;
+        }
+      }
+
       let state = {
+        isBoss: detectBossMode(),
         activeTab: 'order',
         selectedDay: '週六晚',
         orderFilterDay: '全部',
@@ -608,6 +632,13 @@ function doGet(e) {
       }
 
       function render() {
+        if (!state.isBoss && state.activeTab !== 'order') {
+          state.activeTab = 'order';
+        }
+        document.getElementById('topTabBar').classList.toggle('hidden', !state.isBoss);
+        document.getElementById('btnResetOrders').classList.toggle('hidden', !state.isBoss);
+        document.getElementById('btnGoToOrders').textContent = state.isBoss ? '看接單' : '完成（繼續點餐）';
+
         const pendingCount = state.orders.filter(o => o.status !== 'done').length;
         document.getElementById('badgePendingCount').textContent = pendingCount;
 
@@ -831,8 +862,29 @@ function doGet(e) {
 
       document.getElementById('btnGoToOrders').addEventListener('click', () => {
         document.getElementById('orderDoneModal').classList.add('hidden');
-        state.activeTab = 'orders';
-        render();
+        if (state.isBoss) {
+          state.activeTab = 'orders';
+          render();
+        }
+      });
+
+      let tapCount = 0;
+      let tapTimer = null;
+      document.getElementById('brandSecretTrigger').addEventListener('click', () => {
+        tapCount += 1;
+        clearTimeout(tapTimer);
+        tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
+        if (tapCount >= 5) {
+          tapCount = 0;
+          state.isBoss = !state.isBoss;
+          try {
+            if (state.isBoss) localStorage.setItem(BOSS_KEY, '1');
+            else localStorage.removeItem(BOSS_KEY);
+          } catch (e) {}
+          if (!state.isBoss) state.activeTab = 'order';
+          render();
+          showToast(state.isBoss ? '🔓 已解鎖老闆後台模式' : '🔒 已切換回客人點餐畫面');
+        }
       });
 
       document.getElementById('btnResetOrders').addEventListener('click', () => {
@@ -862,12 +914,14 @@ function doGet(e) {
       document.getElementById('btnCopyCustomerLink').addEventListener('click', () => {
         const gasUrl = getGasUrl();
         const base = window.location.href.split('?')[0];
-        if (!gasUrl) {
-          showToast('請先綁定 Google Apps Script 網址再複製連結');
-          return;
-        }
-        const shareUrl = `${base}?api=${encodeURIComponent(gasUrl)}`;
-        copyText(shareUrl, '已複製專屬客人點餐網址（含雲端寫入）！');
+        const shareUrl = gasUrl ? `${base}?api=${encodeURIComponent(gasUrl)}` : base;
+        copyText(shareUrl, '已複製客人點餐網址（無接單管理後台）！');
+      });
+      document.getElementById('btnCopyBossLink').addEventListener('click', () => {
+        const gasUrl = getGasUrl();
+        const base = window.location.href.split('?')[0];
+        const bossUrl = gasUrl ? `${base}?boss=1&api=${encodeURIComponent(gasUrl)}` : `${base}?boss=1`;
+        copyText(bossUrl, '已複製老闆專用網址（含接單管理後台）！');
       });
       document.getElementById('btnSyncFromSheet').addEventListener('click', async () => {
         const gasUrl = getGasUrl();
