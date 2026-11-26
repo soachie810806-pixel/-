@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>折折看 港式薄餅 — 週末接單與備料小幫手</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#D97706" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="港式薄餅助手" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #F4EDE2;
+      color: #29180D;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    .slide-up {
+      animation: slideUp 0.22s ease-out forwards;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="flex justify-center items-start md:py-6 md:px-4">
+
+  <div id="appShell" class="relative mx-auto w-full max-w-[460px] min-h-screen md:min-h-[820px] md:max-h-[900px] md:rounded-[32px] bg-[#FBF7F0] md:shadow-2xl md:border md:border-[#EADBC8] flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white/90 backdrop-blur-md border-b border-[#EFE3D3] px-4 pt-4 pb-3 sticky top-0 z-20">
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-sm text-lg">
+            🥞
+          </div>
+          <div>
+            <h1 class="text-base font-bold text-[#29180D] leading-tight">折折看 港式薄餅</h1>
+            <p class="text-[11px] text-amber-800/80 font-medium">週末限定預購 · 週六、週日到點現煎</p>
+          </div>
+        </div>
+        <button id="btnResetOrders" type="button" title="清空所有訂單" class="p-2 rounded-xl text-amber-900/60 hover:bg-amber-100/60 transition">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Mode Switcher: Order Form vs Boss Prep -->
+      <div class="grid grid-cols-3 gap-1 bg-[#F2E9DC] p-1 rounded-2xl text-xs font-bold">
+        <button data-tab="order" type="button" class="top-tab py-2 rounded-xl bg-white text-[#29180D] shadow-xs transition">
+          點餐預訂
+        </button>
+        <button data-tab="orders" type="button" class="top-tab py-2 rounded-xl text-amber-900/70 hover:text-[#29180D] transition">
+          接單管理 <span id="badgePendingCount" class="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px]">0</span>
+        </button>
+        <button data-tab="prep" type="button" class="top-tab py-2 rounded-xl text-amber-900/70 hover:text-[#29180D] transition">
+          備料換算
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Scrollable Content -->
+    <main class="flex-1 overflow-y-auto px-4 pt-3.5 pb-24 space-y-4">
+
+      <!-- TAB 1: CUSTOMER ORDER / PRE-ORDER -->
+      <section id="viewOrder" class="space-y-4">
+        <!-- Info Banner -->
+        <div class="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-xs text-amber-950 space-y-1">
+          <p class="font-bold flex items-center gap-1.5">
+            <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-600"></i>
+            週末現點現煎 · 經典軟熟口感
+          </p>
+          <p class="text-[11px] text-amber-900/80 leading-relaxed">
+            採用黑白淡奶與吉士粉新鮮調糊，不加鮮果更耐放。過敏原提醒：含蛋、奶、麩質與花生製品。
+          </p>
+        </div>
+
+        <!-- Pickup Day & Time -->
+        <div class="bg-white rounded-2xl p-4 border border-[#EFE3D3] shadow-xs space-y-3">
+          <h2 class="text-sm font-bold text-[#29180D]">1. 選擇取餐時段與稱呼</h2>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" data-day="週六晚" class="day-btn py-2 px-3 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-900 text-xs font-bold transition">
+              週六 (17:00–21:00)
+            </button>
+            <button type="button" data-day="週日" class="day-btn py-2 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold transition">
+              週日 (14:00–20:00)
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label for="customerName" class="block text-[11px] font-semibold text-slate-500 mb-1">取餐稱呼 / 末三碼 *</label>
+              <input id="customerName" type="text" placeholder="例：陳小姐 382" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-500" />
+            </div>
+            <div>
+              <label for="pickupSlot" class="block text-[11px] font-semibold text-slate-500 mb-1">預計取餐時間</label>
+              <select id="pickupSlot" class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-sm bg-white outline-none focus:border-amber-500"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flavor Menu -->
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-[#29180D]">2. 選擇港式薄餅</h2>
+            <span class="text-[11px] text-amber-800/70">透氣牛皮紙袋包裝</span>
+          </div>
+          <div id="menuList" class="space-y-2.5"></div>
+        </div>
+
+        <!-- Drink Menu -->
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-[#29180D]">3. 飲料</h2>
+            <span class="text-[11px] text-amber-800/70">700ml / 500ml 封口杯</span>
+          </div>
+          <div id="drinkList" class="space-y-2.5"></div>
+        </div>
+
+        <!-- Note -->
+        <div class="bg-white rounded-2xl p-3.5 border border-[#EFE3D3]">
+          <label for="orderNote" class="block text-xs font-bold text-[#29180D] mb-1.5">客製備註（選填）</label>
+          <input id="orderNote" type="text" placeholder="例：醬少一點、分開裝、要加熱小卡..." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-500" />
+        </div>
+      </section>
+
+      <!-- TAB 2: BOSS ORDER MANAGEMENT -->
+      <section id="viewOrders" class="hidden space-y-3.5">
+        <div class="bg-white rounded-2xl p-3 border border-[#EFE3D3] flex items-center gap-2">
+          <i data-lucide="message-circle" class="w-4 h-4 text-[#06C755] shrink-0"></i>
+          <input id="lineOaInput" type="text" placeholder="選填：輸入你的 LINE 官方帳號 ID（如 @123abc）可指定直接傳給你" class="flex-1 text-xs text-slate-700 outline-none bg-transparent" />
+          <button id="btnSaveLineOa" type="button" class="px-2.5 py-1 rounded-xl bg-slate-900 text-white text-[11px] font-bold shrink-0">儲存</button>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <button type="button" data-filter-day="全部" class="order-filter-btn px-3 py-1.5 rounded-full text-xs font-bold bg-[#29180D] text-white">全部</button>
+            <button type="button" data-filter-day="週六晚" class="order-filter-btn px-3 py-1.5 rounded-full text-xs font-bold bg-white border border-[#EADBC8] text-amber-900">週六晚</button>
+            <button type="button" data-filter-day="週日" class="order-filter-btn px-3 py-1.5 rounded-full text-xs font-bold bg-white border border-[#EADBC8] text-amber-900">週日</button>
+          </div>
+          <button id="btnExportCsv" type="button" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white border border-[#EADBC8] text-xs font-bold text-amber-900 hover:bg-amber-50 transition">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> 匯出 CSV
+          </button>
+        </div>
+        <div id="ordersList" class="space-y-2.5"></div>
+      </section>
+
+      <!-- TAB 3: BATTER & INGREDIENT PREP CALCULATOR -->
+      <section id="viewPrep" class="hidden space-y-4">
+        <!-- Day Selector for Prep -->
+        <div class="bg-white rounded-2xl p-4 border border-[#EFE3D3] shadow-xs space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-[#29180D] flex items-center gap-1.5">
+              <i data-lucide="calculator" class="w-4 h-4 text-amber-600"></i>
+              分日調糊備料計算
+            </h2>
+            <span class="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">週六/週日分開調糊</span>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            依據預訂總份數自動換算所需麵糊（20–22cm 厚底不沾鍋標準份量），含 10% 預留備品量，避免過夜影響雙效泡打粉發酵。
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" data-prep-day="週六晚" class="prep-day-btn py-2 rounded-xl bg-amber-500 text-white text-xs font-bold transition">週六晚備料</button>
+            <button type="button" data-prep-day="週日" class="prep-day-btn py-2 rounded-xl bg-[#F2E9DC] text-amber-900 text-xs font-bold transition">週日備料</button>
+          </div>
+        </div>
+
+        <!-- Batter Breakdown Card -->
+        <div id="prepSummaryCard" class="bg-white rounded-2xl p-4 border border-[#EFE3D3] shadow-xs space-y-3"></div>
+
+        <!-- Filling Breakdown Card -->
+        <div id="fillingSummaryCard" class="bg-white rounded-2xl p-4 border border-[#EFE3D3] shadow-xs space-y-2.5"></div>
+
+        <!-- Packaging & Reheat Card -->
+        <div class="bg-amber-50/80 rounded-2xl p-4 border border-amber-200/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+              <i data-lucide="tag" class="w-3.5 h-3.5 text-amber-700"></i>
+              包裝過敏原與回烤小卡文字
+            </h3>
+            <button id="btnCopyLabel" type="button" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 transition">
+              複製小卡文字
+            </button>
+          </div>
+          <p id="labelPreviewText" class="text-[11px] text-amber-900/90 bg-white/80 p-2.5 rounded-xl border border-amber-200/60 leading-relaxed">
+            【折折看 港式薄餅】本產品含雞蛋、乳製品、麩質與花生（依口味）。建議趁熱享用；若需回烤，請以氣炸鍋或烤箱 160°C 加熱約 2 分鐘即可恢復微酥軟熟口感！
+          </p>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Sticky Bottom Cart Bar (Only on Order Tab) -->
+    <div id="cartFooter" class="sticky bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#EFE3D3] px-4 py-3 flex items-center justify-between gap-3">
+      <div>
+        <p class="text-[11px] text-slate-500">已選 <strong id="cartCount" class="text-[#29180D]">0</strong> 份</p>
+        <p class="text-base font-bold text-amber-700">NT$ <span id="cartTotal">0</span></p>
+      </div>
+      <button id="btnSubmitOrder" type="button" class="flex-1 max-w-[220px] py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-sm shadow-md active:scale-95 transition">
+        送出預訂訂單
+      </button>
+    </div>
+
+    <!-- Order Confirmation Modal (with LINE message copy) -->
+    <div id="orderDoneModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end md:items-center justify-center p-0 md:p-4">
+      <div class="w-full max-w-[440px] bg-white rounded-t-[28px] md:rounded-[28px] p-5 shadow-2xl slide-up">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-base font-bold text-[#29180D] flex items-center gap-2">
+            <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>
+            訂單已建立
+          </h3>
+          <button id="btnCloseOrderModal" type="button" class="p-1.5 rounded-full bg-slate-100 text-slate-500">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <pre id="lineMessagePreview" class="text-xs text-slate-700 bg-[#FAF6EE] border border-[#EADBC8] rounded-2xl p-3.5 whitespace-pre-wrap font-sans leading-relaxed mb-4"></pre>
+        <div class="space-y-2">
+          <a id="btnSendViaLine" href="#" target="_blank" rel="noopener noreferrer" class="w-full py-3 rounded-2xl bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            一鍵開啟 LINE 傳送訂單
+          </a>
+          <div class="flex gap-2">
+            <button id="btnNativeShare" type="button" class="flex-1 py-2.5 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+              手機分享
+            </button>
+            <button id="btnCopyLineMsg" type="button" class="flex-1 py-2.5 rounded-2xl bg-[#F2E9DC] hover:bg-[#EADBC8] text-[#29180D] text-xs font-bold flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              複製文字
+            </button>
+            <button id="btnGoToOrders" type="button" class="px-3.5 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-bold transition">
+              看接單
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-full bg-[#29180D] text-white text-xs font-semibold shadow-lg flex items-center gap-2 whitespace-nowrap">
+      <i data-lucide="check-circle-2" class="w-4 h-4 text-amber-400"></i>
+      <span id="toastText"></span>
+    </div>
+
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = 'hk_crepe_weekend_v2';
+      const LINE_OA_KEY = 'hk_crepe_line_oa_v1';
+
+      const MENU = [
+        { id: 'choco', type: 'crepe', name: '巧克力', desc: '經典單醬 · 香甜濃郁巧克力醬', price: 45, tag: '經典單醬', allergen: '蛋、奶、麩質' },
+        { id: 'milkcrisp', type: 'crepe', name: '奶酥', desc: '經典單醬 · 金黃香濃奶酥餡', price: 45, tag: '經典單醬', allergen: '蛋、奶、麩質' },
+        { id: 'peanut', type: 'crepe', name: '花生', desc: '經典單醬 · 濃醇香滑花生醬', price: 45, tag: '經典單醬', allergen: '蛋、奶、麩質、花生' },
+        { id: 'creammilkcrisp', type: 'crepe', name: '鮮奶油奶酥', desc: '招牌雙醬 · 柔滑鮮奶油配黃金奶酥', price: 55, tag: '招牌雙醬', allergen: '蛋、奶、麩質' },
+        { id: 'peanutmilk', type: 'crepe', name: '花生煉乳', desc: '招牌雙醬 · 花生醬搭香甜煉乳', price: 50, tag: '招牌雙醬', allergen: '蛋、奶、麩質、花生' },
+        { id: 'oreochoco', type: 'crepe', name: 'OREO 巧克力', desc: '招牌雙醬 · 脆脆 OREO 餅乾碎配巧克力', price: 55, tag: '招牌雙醬', allergen: '蛋、奶、麩質' },
+        { id: 'addon', type: 'addon', name: '任選雙拼口味／加脆片', desc: '加購項目 · 備註欄可寫想搭配的口味', price: 10, tag: '加購 +$10', allergen: '' },
+        { id: 'blacktea', type: 'drink', name: '紅茶', desc: '清香紅茶，搭配薄餅清爽解膩', price: 25, tag: '', allergen: '', milkMl: 0 },
+        { id: 'milktea', type: 'drink', name: '奶茶', desc: '香醇紅茶配黑白淡奶，滑順濃郁', price: 35, tag: '人氣', allergen: '奶', milkMl: 45 }
+      ];
+
+      const SLOTS = {
+        '週六晚': ['17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'],
+        '週日': ['14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00']
+      };
+
+      // Per-crepe batter base (20-22cm soft-thick HK style)
+      // Approx 1kg flour yields ~28-30 crepes -> ~35g flour per crepe
+      const RECIPE_PER_CREPE = {
+        flourG: 35,
+        evapMilkG: 14, // ~410g can per ~28 crepes
+        waterMl: 14,   // 1:1 diluted with evaporated milk
+        eggCount: 0.2, // 1 egg per 5 crepes
+        custardG: 3,
+        bakingPowderG: 1.2,
+        sugarG: 5
+      };
+
+      function getDefaultOrders() {
+        return [];
+      }
+
+      let state = {
+        activeTab: 'order',
+        selectedDay: '週六晚',
+        orderFilterDay: '全部',
+        prepDay: '週六晚',
+        cart: {},
+        orders: []
+      };
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              state.orders = parsed;
+              return;
+            }
+          }
+        } catch (e) {}
+        state.orders = getDefaultOrders();
+        saveState();
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state.orders));
+        } catch (e) {}
+      }
+
+      let toastTimer = null;
+      function showToast(msg) {
+        document.getElementById('toastText').textContent = msg;
+        const el = document.getElementById('toast');
+        el.classList.remove('hidden');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.add('hidden'), 2400);
+      }
+
+      function copyText(txt, msg) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(() => showToast(msg)).catch(() => fallbackCopy(txt, msg));
+        } else {
+          fallbackCopy(txt, msg);
+        }
+      }
+
+      function fallbackCopy(txt, msg) {
+        const ta = document.createElement('textarea');
+        ta.value = txt;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        showToast(msg);
+      }
+
+      function escapeHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+
+      function renderSlots() {
+        const select = document.getElementById('pickupSlot');
+        const list = SLOTS[state.selectedDay] || SLOTS['週六晚'];
+        select.innerHTML = list.map(t => `<option value="${t}">${t}</option>`).join('');
+      }
+
+      function renderMenuCards(items) {
+        return items.map(item => {
+          const qty = state.cart[item.id] || 0;
+          return `
+            <div class="bg-white rounded-2xl p-3.5 border ${qty > 0 ? 'border-amber-500 ring-1 ring-amber-200' : 'border-[#EFE3D3]'} flex items-center justify-between gap-3 transition">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <h3 class="text-sm font-bold text-[#29180D]">${item.name}</h3>
+                  ${item.tag ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800">${item.tag}</span>` : ''}
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5">${item.desc}</p>
+                <p class="text-xs font-bold text-amber-700 mt-1">NT$ ${item.price}</p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" data-qty-op="dec" data-id="${item.id}" class="qty-btn w-8 h-8 rounded-xl bg-[#F2E9DC] text-[#29180D] font-bold flex items-center justify-center active:scale-90 transition">−</button>
+                <span class="w-5 text-center text-sm font-bold">${qty}</span>
+                <button type="button" data-qty-op="inc" data-id="${item.id}" class="qty-btn w-8 h-8 rounded-xl bg-amber-500 text-white font-bold flex items-center justify-center active:scale-90 transition">+</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderMenu() {
+        const crepes = MENU.filter(m => m.type === 'crepe').sort((a, b) => a.price - b.price);
+        const addons = MENU.filter(m => m.type === 'addon').sort((a, b) => a.price - b.price);
+        const drinks = MENU.filter(m => m.type === 'drink').sort((a, b) => a.price - b.price);
+        document.getElementById('menuList').innerHTML = renderMenuCards([...crepes, ...addons]);
+        document.getElementById('drinkList').innerHTML = renderMenuCards(drinks);
+      }
+
+      function renderCartFooter() {
+        let count = 0;
+        let total = 0;
+        MENU.forEach(m => {
+          const q = state.cart[m.id] || 0;
+          count += q;
+          total += q * m.price;
+        });
+        document.getElementById('cartCount').textContent = count;
+        document.getElementById('cartTotal').textContent = total;
+        document.getElementById('cartFooter').classList.toggle('hidden', state.activeTab !== 'order');
+      }
+
+      function renderOrders() {
+        const list = state.orders.filter(o => state.orderFilterDay === '全部' || o.day === state.orderFilterDay);
+        const container = document.getElementById('ordersList');
+        if (list.length === 0) {
+          container.innerHTML = `<div class="bg-white rounded-2xl p-8 text-center border border-dashed border-amber-300 text-xs text-slate-500">目前沒有符合時段的訂單</div>`;
+          return;
+        }
+
+        container.innerHTML = list.map(ord => {
+          const itemsSummary = Object.entries(ord.items).map(([id, q]) => {
+            const m = MENU.find(x => x.id === id);
+            return m ? `${m.name} ×${q}` : '';
+          }).filter(Boolean).join('、');
+          const isDone = ord.status === 'done';
+          return `
+            <article class="bg-white rounded-2xl p-4 border ${isDone ? 'border-emerald-200 opacity-75' : 'border-[#EFE3D3]'} shadow-xs space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900">${ord.day} ${ord.slot}</span>
+                  <span class="text-sm font-bold text-[#29180D]">${escapeHtml(ord.customer)}</span>
+                </div>
+                <span class="text-sm font-bold text-amber-700">NT$ ${ord.total}</span>
+              </div>
+              <p class="text-xs font-medium text-slate-700">${escapeHtml(itemsSummary)}</p>
+              ${ord.note ? `<p class="text-[11px] text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg">備註：${escapeHtml(ord.note)}</p>` : ''}
+              <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                <button type="button" data-ord-action="delete" data-id="${ord.id}" class="ord-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition">刪除</button>
+                <button type="button" data-ord-action="toggle" data-id="${ord.id}" class="ord-btn px-3 py-1.5 rounded-xl text-xs font-bold ${isDone ? 'bg-slate-200 text-slate-700' : 'bg-emerald-600 text-white'} transition">
+                  ${isDone ? '已取餐 (復原)' : '標記已取餐'}
+                </button>
+              </div>
+            </article>
+          `;
+        }).join('');
+      }
+
+      function renderPrep() {
+        const dayOrders = state.orders.filter(o => o.day === state.prepDay && o.status !== 'done');
+        let totalCrepes = 0;
+        let totalDrinks = 0;
+        let drinkMilkMl = 0;
+        let totalRevenue = 0;
+        const flavorCounts = {};
+        MENU.forEach(m => { flavorCounts[m.id] = 0; });
+
+        dayOrders.forEach(ord => {
+          totalRevenue += ord.total;
+          Object.entries(ord.items).forEach(([id, q]) => {
+            const itemMeta = MENU.find(m => m.id === id);
+            if (itemMeta && itemMeta.type === 'drink') {
+              totalDrinks += q;
+              drinkMilkMl += q * (itemMeta.milkMl || 0);
+            } else if (itemMeta && itemMeta.type === 'crepe') {
+              totalCrepes += q;
+            }
+            flavorCounts[id] = (flavorCounts[id] || 0) + q;
+          });
+        });
+
+        // Include 10% buffer for crepe batter
+        const bufferCrepes = totalCrepes > 0 ? Math.ceil(totalCrepes * 1.1) : 0;
+        const flour = Math.round(bufferCrepes * RECIPE_PER_CREPE.flourG);
+        const evapMilk = Math.round(bufferCrepes * RECIPE_PER_CREPE.evapMilkG);
+        const water = Math.round(bufferCrepes * RECIPE_PER_CREPE.waterMl);
+        const eggs = Math.ceil(bufferCrepes * RECIPE_PER_CREPE.eggCount);
+        const custard = Math.round(bufferCrepes * RECIPE_PER_CREPE.custardG);
+        const bakingPowder = (bufferCrepes * RECIPE_PER_CREPE.bakingPowderG).toFixed(1);
+        const cansNeeded = ((evapMilk + drinkMilkMl) / 410).toFixed(1);
+
+        document.getElementById('prepSummaryCard').innerHTML = `
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div>
+              <p class="text-xs text-slate-500">${state.prepDay} 待製作（含 10% 麵糊預留）</p>
+              <p class="text-base font-bold text-[#29180D]">薄餅 ${totalCrepes} 份 · 飲品 ${totalDrinks} 杯</p>
+              <p class="text-[11px] font-medium text-amber-700">麵糊按 ${bufferCrepes} 份計算 · 飲品另需淡奶約 ${drinkMilkMl} ml</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-slate-500">預估營業額</p>
+              <p class="text-base font-bold text-emerald-700">NT$ ${totalRevenue}</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5 text-xs pt-1">
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-slate-500">低筋麵粉 (1kg袋)</p>
+              <p class="text-sm font-bold text-[#29180D] mt-0.5">${flour} g</p>
+            </div>
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-slate-500">黑白淡奶 (410g/罐)</p>
+              <p class="text-sm font-bold text-[#29180D] mt-0.5">${evapMilk} g <span class="text-[11px] font-normal text-slate-500">(約 ${cansNeeded} 罐)</span></p>
+            </div>
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-slate-500">飲用水 (1:1 稀釋)</p>
+              <p class="text-sm font-bold text-[#29180D] mt-0.5">${water} ml</p>
+            </div>
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-slate-500">雞蛋</p>
+              <p class="text-sm font-bold text-[#29180D] mt-0.5">${eggs} 顆</p>
+            </div>
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-slate-500">吉士粉</p>
+              <p class="text-sm font-bold text-[#29180D] mt-0.5">${custard} g</p>
+            </div>
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-slate-500">雙效泡打粉</p>
+              <p class="text-sm font-bold text-[#29180D] mt-0.5">${bakingPowder} g</p>
+            </div>
+          </div>
+        `;
+
+        const activeFlavors = MENU.filter(m => flavorCounts[m.id] > 0);
+        document.getElementById('fillingSummaryCard').innerHTML = `
+          <h3 class="text-xs font-bold text-[#29180D]">${state.prepDay} 各口味抹醬與飲品備料統計</h3>
+          ${activeFlavors.length === 0
+            ? `<p class="text-xs text-slate-400 py-2">該時段尚無待製作訂單</p>`
+            : `<div class="space-y-1.5">${activeFlavors.map(m => `
+                <div class="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-0">
+                  <span class="font-medium text-slate-700">${m.name}</span>
+                  <span class="font-bold text-amber-700">${flavorCounts[m.id]} ${m.type === "drink" ? "杯" : "份"}</span>
+                </div>
+              `).join('')}</div>`
+          }
+        `;
+      }
+
+      function render() {
+        const pendingCount = state.orders.filter(o => o.status !== 'done').length;
+        document.getElementById('badgePendingCount').textContent = pendingCount;
+
+        document.getElementById('viewOrder').classList.toggle('hidden', state.activeTab !== 'order');
+        document.getElementById('viewOrders').classList.toggle('hidden', state.activeTab !== 'orders');
+        document.getElementById('viewPrep').classList.toggle('hidden', state.activeTab !== 'prep');
+
+        document.querySelectorAll('.top-tab').forEach(btn => {
+          const active = btn.dataset.tab === state.activeTab;
+          btn.className = active
+            ? 'top-tab py-2 rounded-xl bg-white text-[#29180D] shadow-xs transition'
+            : 'top-tab py-2 rounded-xl text-amber-900/70 hover:text-[#29180D] transition';
+        });
+
+        document.querySelectorAll('.day-btn').forEach(btn => {
+          const active = btn.dataset.day === state.selectedDay;
+          btn.className = active
+            ? 'day-btn py-2 px-3 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-900 text-xs font-bold transition'
+            : 'day-btn py-2 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold transition';
+        });
+
+        document.querySelectorAll('.order-filter-btn').forEach(btn => {
+          const active = btn.dataset.filterDay === state.orderFilterDay;
+          btn.className = active
+            ? 'order-filter-btn px-3 py-1.5 rounded-full text-xs font-bold bg-[#29180D] text-white'
+            : 'order-filter-btn px-3 py-1.5 rounded-full text-xs font-bold bg-white border border-[#EADBC8] text-amber-900';
+        });
+
+        document.querySelectorAll('.prep-day-btn').forEach(btn => {
+          const active = btn.dataset.prepDay === state.prepDay;
+          btn.className = active
+            ? 'prep-day-btn py-2 rounded-xl bg-amber-500 text-white text-xs font-bold transition'
+            : 'prep-day-btn py-2 rounded-xl bg-[#F2E9DC] text-amber-900 text-xs font-bold transition';
+        });
+
+        renderMenu();
+        renderCartFooter();
+        renderOrders();
+        renderPrep();
+
+        if (window.lucide) lucide.createIcons();
+      }
+
+      // Event Bindings
+      document.querySelectorAll('.top-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.activeTab = btn.dataset.tab;
+          render();
+        });
+      });
+
+      document.querySelectorAll('.day-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.selectedDay = btn.dataset.day;
+          renderSlots();
+          render();
+        });
+      });
+
+      document.querySelectorAll('.order-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.orderFilterDay = btn.dataset.filterDay;
+          render();
+        });
+      });
+
+      document.querySelectorAll('.prep-day-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.prepDay = btn.dataset.prepDay;
+          render();
+        });
+      });
+
+      document.getElementById('viewOrder').addEventListener('click', (e) => {
+        const btn = e.target.closest('.qty-btn');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        const op = btn.dataset.qtyOp;
+        const cur = state.cart[id] || 0;
+        if (op === 'inc') state.cart[id] = cur + 1;
+        else if (op === 'dec' && cur > 0) state.cart[id] = cur - 1;
+        if (state.cart[id] === 0) delete state.cart[id];
+        render();
+      });
+
+      document.getElementById('btnSubmitOrder').addEventListener('click', () => {
+        const customer = document.getElementById('customerName').value.trim();
+        const slot = document.getElementById('pickupSlot').value;
+        const note = document.getElementById('orderNote').value.trim();
+        const entries = Object.entries(state.cart);
+        if (entries.length === 0) {
+          showToast('請先選擇至少 1 份薄餅或飲品');
+          return;
+        }
+        if (!customer) {
+          showToast('請填寫取餐稱呼或電話末三碼');
+          return;
+        }
+        let total = 0;
+        const lines = [];
+        entries.forEach(([id, q]) => {
+          const m = MENU.find(x => x.id === id);
+          if (m) {
+            total += m.price * q;
+            lines.push(`• ${m.name} × ${q}（$${m.price * q}）`);
+          }
+        });
+
+        const newOrd = {
+          id: 'ORD-' + String(Date.now()).slice(-4),
+          day: state.selectedDay,
+          slot,
+          customer,
+          items: { ...state.cart },
+          note,
+          total,
+          status: 'pending',
+          createdAt: Date.now()
+        };
+        state.orders.unshift(newOrd);
+        saveState();
+
+        const msg = [
+          `🥞【折折看 港式薄餅 預訂確認】`,
+          `取餐人：${customer}`,
+          `時段：${state.selectedDay} ${slot}`,
+          ...lines,
+          note ? `備註：${note}` : '',
+          `合計：NT$ ${total}`,
+          `💡 回烤建議：160°C 氣炸或烤箱 2 分鐘`
+        ].filter(Boolean).join('\n');
+
+        let oaId = '';
+        try { oaId = (localStorage.getItem(LINE_OA_KEY) || '').trim(); } catch (e) {}
+        const encodedMsg = encodeURIComponent(msg);
+        const lineUrl = oaId
+          ? `https://line.me/R/oaMessage/${encodeURIComponent(oaId.startsWith('@') ? oaId : '@' + oaId)}/?${encodedMsg}`
+          : `https://line.me/R/share?text=${encodedMsg}`;
+        document.getElementById('btnSendViaLine').href = lineUrl;
+        document.getElementById('lineMessagePreview').textContent = msg;
+        document.getElementById('orderDoneModal').classList.remove('hidden');
+
+        state.cart = {};
+        document.getElementById('customerName').value = '';
+        document.getElementById('orderNote').value = '';
+        render();
+      });
+
+      document.getElementById('ordersList').addEventListener('click', (e) => {
+        const btn = e.target.closest('.ord-btn');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        const action = btn.dataset.ordAction;
+        const ord = state.orders.find(o => o.id === id);
+        if (!ord) return;
+        if (action === 'toggle') {
+          ord.status = ord.status === 'done' ? 'pending' : 'done';
+          saveState();
+          render();
+          showToast(ord.status === 'done' ? '已標記為取餐完成' : '已恢復為待製作');
+        } else if (action === 'delete') {
+          state.orders = state.orders.filter(o => o.id !== id);
+          saveState();
+          render();
+          showToast('已刪除訂單');
+        }
+      });
+
+      document.getElementById('btnExportCsv').addEventListener('click', () => {
+        const rows = [['訂單編號', '取餐日', '時段', '客人', '品項明細', '備註', '金額', '狀態']];
+        state.orders.forEach(ord => {
+          const itemsStr = Object.entries(ord.items).map(([id, q]) => {
+            const m = MENU.find(x => x.id === id);
+            return m ? `${m.name}x${q}` : '';
+          }).filter(Boolean).join(' / ');
+          rows.push([ord.id, ord.day, ord.slot, ord.customer, itemsStr, ord.note || '', ord.total, ord.status === 'done' ? '已取餐' : '待製作']);
+        });
+        const csv = '\uFEFF' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '港式薄餅週末訂單.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast('已匯出 CSV 訂單報表');
+      });
+
+      document.getElementById('btnCopyLabel').addEventListener('click', () => {
+        copyText(document.getElementById('labelPreviewText').textContent.trim(), '已複製過敏原與回烤小卡文字');
+      });
+
+      document.getElementById('btnNativeShare').addEventListener('click', () => {
+        const msg = document.getElementById('lineMessagePreview').textContent;
+        if (navigator.share) {
+          navigator.share({ title: '折折看 港式薄餅預訂', text: msg }).catch(() => {});
+        } else {
+          copyText(msg, '目前瀏覽器不支援系統分享，已為您複製文字');
+        }
+      });
+
+      document.getElementById('btnCopyLineMsg').addEventListener('click', () => {
+        copyText(document.getElementById('lineMessagePreview').textContent, '已複製 LINE 預訂訊息');
+      });
+
+      document.getElementById('btnCloseOrderModal').addEventListener('click', () => {
+        document.getElementById('orderDoneModal').classList.add('hidden');
+      });
+
+      document.getElementById('btnGoToOrders').addEventListener('click', () => {
+        document.getElementById('orderDoneModal').classList.add('hidden');
+        state.activeTab = 'orders';
+        render();
+      });
+
+      document.getElementById('btnResetOrders').addEventListener('click', () => {
+        state.orders = getDefaultOrders();
+        saveState();
+        render();
+        showToast('已清空所有訂單');
+      });
+
+      try {
+        const savedOa = localStorage.getItem(LINE_OA_KEY) || '';
+        document.getElementById('lineOaInput').value = savedOa;
+      } catch (e) {}
+      document.getElementById('btnSaveLineOa').addEventListener('click', () => {
+        const val = document.getElementById('lineOaInput').value.trim();
+        try { localStorage.setItem(LINE_OA_KEY, val); } catch (e) {}
+        showToast(val ? `已綁定 LINE ID：${val}` : '已清除指定 LINE ID');
+      });
+
+      loadState();
+      renderSlots();
+      render();
+    })();
+  </script>
+</body>
+</html>

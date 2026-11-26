@@ -1,0 +1,8 @@
+{
+  "name": "折折看 港式薄餅 — 週末預購與備料助手",
+  "short_name": "折折看薄餅",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FBF7F0",
+  "theme_color": "#D97706"
+}
