@@ -256,25 +256,9 @@
         </div>
         <p id="cloudSyncStatus" class="hidden text-xs font-semibold px-3 py-1.5 rounded-xl mb-3"></p>
         <pre id="lineMessagePreview" class="text-xs text-slate-700 bg-[#FAF6EE] border border-[#EADBC8] rounded-2xl p-3.5 whitespace-pre-wrap font-sans leading-relaxed mb-4"></pre>
-        <div class="space-y-2">
-          <a id="btnSendViaLine" href="#" target="_blank" rel="noopener noreferrer" class="w-full py-3 rounded-2xl bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition">
-            <i data-lucide="send" class="w-4 h-4"></i>
-            一鍵開啟 LINE 傳送訂單
-          </a>
-          <div class="flex gap-2">
-            <button id="btnNativeShare" type="button" class="flex-1 py-2.5 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold flex items-center justify-center gap-1.5 transition">
-              <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
-              手機分享
-            </button>
-            <button id="btnCopyLineMsg" type="button" class="flex-1 py-2.5 rounded-2xl bg-[#F2E9DC] hover:bg-[#EADBC8] text-[#29180D] text-xs font-bold flex items-center justify-center gap-1.5 transition">
-              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-              複製文字
-            </button>
-            <button id="btnGoToOrders" type="button" class="px-3.5 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-bold transition">
-              看接單
-            </button>
-          </div>
-        </div>
+        <button id="btnGoToOrders" type="button" class="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold transition">
+          看接單
+        </button>
       </div>
     </div>
 
@@ -756,13 +740,7 @@ function doGet(e) {
           `💡 回烤建議：160°C 氣炸或烤箱 2 分鐘`
         ].filter(Boolean).join('\n');
 
-        let oaId = '';
-        try { oaId = (localStorage.getItem(LINE_OA_KEY) || '').trim(); } catch (e) {}
-        const encodedMsg = encodeURIComponent(msg);
-        const lineUrl = oaId
-          ? `https://line.me/R/oaMessage/${encodeURIComponent(oaId.startsWith('@') ? oaId : '@' + oaId)}/?${encodedMsg}`
-          : `https://line.me/R/share?text=${encodedMsg}`;
-        document.getElementById('btnSendViaLine').href = lineUrl;
+
         document.getElementById('lineMessagePreview').textContent = msg;
 
         const gasUrl = getGasUrl();
@@ -845,18 +823,7 @@ function doGet(e) {
         copyText(document.getElementById('labelPreviewText').textContent.trim(), '已複製過敏原與回烤小卡文字');
       });
 
-      document.getElementById('btnNativeShare').addEventListener('click', () => {
-        const msg = document.getElementById('lineMessagePreview').textContent;
-        if (navigator.share) {
-          navigator.share({ title: '折折看 港式薄餅預訂', text: msg }).catch(() => {});
-        } else {
-          copyText(msg, '目前瀏覽器不支援系統分享，已為您複製文字');
-        }
-      });
 
-      document.getElementById('btnCopyLineMsg').addEventListener('click', () => {
-        copyText(document.getElementById('lineMessagePreview').textContent, '已複製 LINE 預訂訊息');
-      });
 
       document.getElementById('btnCloseOrderModal').addEventListener('click', () => {
         document.getElementById('orderDoneModal').classList.add('hidden');
