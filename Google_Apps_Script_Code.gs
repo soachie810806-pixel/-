@@ -16,6 +16,20 @@ function doPost(e) {
     '待製作',
     JSON.stringify(data.items)
   ]);
+  try {
+    var ownerEmail = Session.getActiveUser().getEmail();
+    if (ownerEmail) {
+      var subject = '🥞 新薄餅訂單！' + data.day + ' ' + data.slot + '｜' + data.customer + '（$' + data.total + '）';
+      var body = '收到新預訂訂單：\n\n'
+        + '訂單編號：' + data.id + '\n'
+        + '取餐人：' + data.customer + '\n'
+        + '取餐時段：' + data.day + ' ' + data.slot + '\n'
+        + '品項明細：' + data.itemsText + '\n'
+        + '備註：' + (data.note || '無') + '\n'
+        + '總金額：NT$ ' + data.total;
+      MailApp.sendEmail(ownerEmail, subject, body);
+    }
+  } catch (mailErr) {}
   return ContentService.createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
 }

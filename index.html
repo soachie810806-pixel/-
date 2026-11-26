@@ -140,12 +140,23 @@
 
       <!-- TAB 2: BOSS ORDER MANAGEMENT -->
       <section id="viewOrders" class="hidden space-y-3.5">
-        <!-- Google Sheets Cloud Backend Config -->
-        <div class="bg-white rounded-2xl p-3.5 border border-[#EFE3D3] space-y-2.5">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-xs font-bold text-[#29180D] flex items-center gap-1.5">
-              <i data-lucide="sheet" class="w-4 h-4 text-emerald-600"></i>
-              Google 試算表雲端串接
+        <!-- Live Boss Statistics Dashboard -->
+        <div id="bossStatsCard" class="bg-white rounded-2xl p-4 border border-[#EFE3D3] shadow-xs space-y-3"></div>
+
+        <!-- Collapsible Cloud Backend Config -->
+        <details class="bg-white rounded-2xl border border-[#EFE3D3] group">
+          <summary class="px-3.5 py-2.5 text-xs font-bold text-[#29180D] flex items-center justify-between cursor-pointer list-none">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="settings" class="w-4 h-4 text-amber-600"></i>
+              雲端試算表與分享網址設定
+            </span>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition"></i>
+          </summary>
+          <div class="px-3.5 pb-3.5 pt-1 space-y-2.5 border-t border-slate-100">
+          <div class="flex items-center justify-between gap-2 pt-1">
+            <span class="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+              <i data-lucide="sheet" class="w-3.5 h-3.5"></i>
+              Google 試算表串接
             </span>
             <button id="btnCopyGasCode" type="button" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition">
               複製 Apps Script 程式碼
@@ -178,6 +189,8 @@
           <input id="lineOaInput" type="text" placeholder="選填：輸入你的 LINE 官方帳號 ID（如 @123abc）可指定直接傳給你" class="flex-1 text-xs text-slate-700 outline-none bg-transparent" />
           <button id="btnSaveLineOa" type="button" class="px-2.5 py-1 rounded-xl bg-slate-900 text-white text-[11px] font-bold shrink-0">儲存</button>
         </div>
+          </div>
+        </details>
 
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-1.5">
@@ -301,6 +314,20 @@
     '待製作',
     JSON.stringify(data.items)
   ]);
+  try {
+    var ownerEmail = Session.getActiveUser().getEmail();
+    if (ownerEmail) {
+      var subject = '🥞 新薄餅訂單！' + data.day + ' ' + data.slot + '｜' + data.customer + '（$' + data.total + '）';
+      var body = '收到新預訂訂單：\n\n'
+        + '訂單編號：' + data.id + '\n'
+        + '取餐人：' + data.customer + '\n'
+        + '取餐時段：' + data.day + ' ' + data.slot + '\n'
+        + '品項明細：' + data.itemsText + '\n'
+        + '備註：' + (data.note || '無') + '\n'
+        + '總金額：NT$ ' + data.total;
+      MailApp.sendEmail(ownerEmail, subject, body);
+    }
+  } catch (mailErr) {}
   return ContentService.createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
 }
@@ -507,7 +534,87 @@ function doGet(e) {
         document.getElementById('cartFooter').classList.toggle('hidden', state.activeTab !== 'order');
       }
 
+      function renderBossStats() {
+        const card = document.getElementById('bossStatsCard');
+        const totalOrders = state.orders.length;
+        const pendingOrders = state.orders.filter(o => o.status !== 'done').length;
+        const doneOrders = totalOrders - pendingOrders;
+        let totalRev = 0, satRev = 0, sunRev = 0;
+        let satCount = 0, sunCount = 0;
+        let totalCrepes = 0, totalDrinks = 0;
+        const itemStats = {};
+        MENU.forEach(m => { itemStats[m.id] = { name: m.name, type: m.type, qty: 0, rev: 0 }; });
+
+        state.orders.forEach(ord => {
+          totalRev += ord.total || 0;
+          if (ord.day === '週六晚') { satRev += ord.total || 0; satCount += 1; }
+          else if (ord.day === '週日') { sunRev += ord.total || 0; sunCount += 1; }
+          Object.entries(ord.items || {}).forEach(([id, q]) => {
+            const m = MENU.find(x => x.id === id);
+            if (!m) return;
+            if (m.type === 'crepe') totalCrepes += q;
+            else if (m.type === 'drink') totalDrinks += q;
+            itemStats[id].qty += q;
+            itemStats[id].rev += q * m.price;
+          });
+        });
+
+        const topItems = Object.values(itemStats).filter(x => x.qty > 0).sort((a, b) => b.qty - a.qty);
+        const maxQty = topItems.length > 0 ? topItems[0].qty : 1;
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-[#29180D] flex items-center gap-1.5">
+              <i data-lucide="bar-chart-3" class="w-4 h-4 text-amber-600"></i>
+              營運統計總覽
+            </h2>
+            <span class="text-[11px] font-semibold text-slate-500">待做 ${pendingOrders} · 已取 ${doneOrders}</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-[10px] text-slate-500 font-medium">累積營業額</p>
+              <p class="text-sm font-bold text-emerald-700 mt-0.5">NT$ ${totalRev}</p>
+            </div>
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-[10px] text-slate-500 font-medium">薄餅總數</p>
+              <p class="text-sm font-bold text-[#29180D] mt-0.5">${totalCrepes} 份</p>
+            </div>
+            <div class="bg-[#FAF6EE] p-2.5 rounded-xl">
+              <p class="text-[10px] text-slate-500 font-medium">飲料總數</p>
+              <p class="text-sm font-bold text-[#29180D] mt-0.5">${totalDrinks} 杯</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-[11px]">
+            <div class="px-2.5 py-1.5 rounded-xl bg-amber-50/70 border border-amber-200/60 flex items-center justify-between">
+              <span class="font-semibold text-amber-900">週六 (${satCount}單)</span>
+              <span class="font-bold text-amber-800">$${satRev}</span>
+            </div>
+            <div class="px-2.5 py-1.5 rounded-xl bg-amber-50/70 border border-amber-200/60 flex items-center justify-between">
+              <span class="font-semibold text-amber-900">週日 (${sunCount}單)</span>
+              <span class="font-bold text-amber-800">$${sunRev}</span>
+            </div>
+          </div>
+          ${topItems.length > 0 ? `
+            <div class="pt-1 border-t border-slate-100 space-y-1.5">
+              <p class="text-[11px] font-bold text-slate-500">熱銷品項排行</p>
+              ${topItems.slice(0, 5).map(item => `
+                <div class="space-y-0.5">
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="font-semibold text-slate-700">${item.name}</span>
+                    <span class="font-bold text-amber-800">${item.qty} ${item.type === 'drink' ? '杯' : '份'} ($${item.rev})</span>
+                  </div>
+                  <div class="w-full h-1.5 bg-[#F2E9DC] rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style="width: ${Math.round((item.qty / maxQty) * 100)}%"></div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : `<p class="text-[11px] text-slate-400 text-center py-1">尚無銷售統計，收到訂單後將自動排行</p>`}
+        `;
+      }
+
       function renderOrders() {
+        renderBossStats();
         const list = state.orders.filter(o => state.orderFilterDay === '全部' || o.day === state.orderFilterDay);
         const container = document.getElementById('ordersList');
         if (list.length === 0) {
@@ -687,6 +794,9 @@ function doGet(e) {
         btn.addEventListener('click', () => {
           state.activeTab = btn.dataset.tab;
           render();
+          if (state.isBoss && (state.activeTab === 'orders' || state.activeTab === 'prep')) {
+            syncFromSheet(true);
+          }
         });
       });
 
@@ -923,13 +1033,13 @@ function doGet(e) {
         const bossUrl = gasUrl ? `${base}?boss=1&api=${encodeURIComponent(gasUrl)}` : `${base}?boss=1`;
         copyText(bossUrl, '已複製老闆專用網址（含接單管理後台）！');
       });
-      document.getElementById('btnSyncFromSheet').addEventListener('click', async () => {
+      async function syncFromSheet(silent = false) {
         const gasUrl = getGasUrl();
         if (!gasUrl) {
-          showToast('請先貼上並綁定 Apps Script 網址');
+          if (!silent) showToast('請先貼上並綁定 Apps Script 網址');
           return;
         }
-        showToast('正在從試算表讀取最新訂單...');
+        if (!silent) showToast('正在從試算表讀取最新訂單...');
         try {
           const res = await fetch(gasUrl);
           const data = await res.json();
@@ -937,14 +1047,16 @@ function doGet(e) {
             state.orders = data.orders;
             saveState();
             render();
-            showToast(`已同步 ${data.orders.length} 筆雲端訂單`);
-          } else {
+            if (!silent) showToast(`已同步 ${data.orders.length} 筆雲端訂單`);
+          } else if (!silent) {
             showToast('試算表目前沒有訂單資料');
           }
         } catch (err) {
-          showToast('無法讀取試算表，請確認部署權限已設為「所有人」');
+          if (!silent) showToast('無法讀取試算表，請確認部署權限已設為「所有人」');
         }
-      });
+      }
+
+      document.getElementById('btnSyncFromSheet').addEventListener('click', () => syncFromSheet(false));
 
       document.getElementById('btnSaveLineOa').addEventListener('click', () => {
         const val = document.getElementById('lineOaInput').value.trim();
@@ -955,6 +1067,14 @@ function doGet(e) {
       loadState();
       renderSlots();
       render();
+      if (state.isBoss && getGasUrl()) {
+        syncFromSheet(true);
+      }
+      setInterval(() => {
+        if (state.isBoss && getGasUrl() && (state.activeTab === 'orders' || state.activeTab === 'prep')) {
+          syncFromSheet(true);
+        }
+      }, 15000);
     })();
   </script>
 </body>
