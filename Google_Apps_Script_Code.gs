@@ -55,6 +55,12 @@ function doGet(e) {
       createdAt: new Date(r[1]).getTime() || Date.now()
     });
   }
-  return ContentService.createTextOutput(JSON.stringify({ orders: list.reverse() }))
+  var payload = JSON.stringify({ orders: list.reverse() });
+  var cb = e && e.parameter && e.parameter.callback;
+  if (cb) {
+    return ContentService.createTextOutput(cb + '(' + payload + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(payload)
     .setMimeType(ContentService.MimeType.JSON);
 }

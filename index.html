@@ -359,7 +359,13 @@ function doGet(e) {
       createdAt: new Date(r[1]).getTime() || Date.now()
     });
   }
-  return ContentService.createTextOutput(JSON.stringify({ orders: list.reverse() }))
+  var payload = JSON.stringify({ orders: list.reverse() });
+  var cb = e && e.parameter && e.parameter.callback;
+  if (cb) {
+    return ContentService.createTextOutput(cb + '(' + payload + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(payload)
     .setMimeType(ContentService.MimeType.JSON);
 }`;
 
@@ -1037,6 +1043,33 @@ function doGet(e) {
         copyText(`${base}?boss=1`, '已複製老闆專用網址（含接單管理後台）！');
       });
       document.getElementById('btnQuickSync').addEventListener('click', () => syncFromSheet(false));
+      function loadViaJsonp(url) {
+        return new Promise((resolve, reject) => {
+          const cbName = '__crepeGasCb_' + Date.now();
+          const script = document.createElement('script');
+          const timer = setTimeout(() => {
+            cleanup();
+            reject(new Error('timeout'));
+          }, 8000);
+          function cleanup() {
+            clearTimeout(timer);
+            try { delete window[cbName]; } catch (e) {}
+            if (script.parentNode) script.parentNode.removeChild(script);
+          }
+          window[cbName] = (data) => {
+            cleanup();
+            resolve(data);
+          };
+          script.onerror = () => {
+            cleanup();
+            reject(new Error('jsonp_error'));
+          };
+          const sep = url.includes('?') ? '&' : '?';
+          script.src = `${url}${sep}callback=${cbName}&t=${Date.now()}`;
+          document.body.appendChild(script);
+        });
+      }
+
       async function syncFromSheet(silent = false) {
         const gasUrl = getGasUrl();
         const badge = document.getElementById('cloudBadgeText');
@@ -1046,9 +1079,14 @@ function doGet(e) {
         }
         if (!silent) showToast('正在從試算表讀取最新訂單...');
         try {
-          const res = await fetch(gasUrl);
-          const data = await res.json();
-          if (Array.isArray(data.orders)) {
+          let data = null;
+          try {
+            const res = await fetch(gasUrl, { redirect: 'follow' });
+            data = await res.json();
+          } catch (fetchErr) {
+            data = await loadViaJsonp(gasUrl);
+          }
+          if (data && Array.isArray(data.orders)) {
             state.orders = data.orders;
             saveState();
             render();
@@ -1059,8 +1097,8 @@ function doGet(e) {
             showToast('試算表目前沒有訂單資料');
           }
         } catch (err) {
-          if (badge) badge.textContent = '⚠️ 無法讀取試算表（請確認部署權限為所有人）';
-          if (!silent) showToast('無法讀取試算表，請確認部署權限已設為「所有人」');
+          if (badge) badge.textContent = '⚠️ 無法讀取試算表（請確認已建立新版本部署）';
+          if (!silent) showToast('讀取失敗，請確認 Apps Script 已建立新版本且權限為所有人');
         }
       }
 
