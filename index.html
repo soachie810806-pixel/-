@@ -140,6 +140,12 @@
 
       <!-- TAB 2: BOSS ORDER MANAGEMENT -->
       <section id="viewOrders" class="hidden space-y-3.5">
+        <!-- Cloud Sync Status Bar -->
+        <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200/80 text-[11px]">
+          <span id="cloudBadgeText" class="font-semibold text-emerald-800">☁️ 雲端試算表已內建連線</span>
+          <button id="btnQuickSync" type="button" class="font-bold text-emerald-700 hover:underline">立即同步</button>
+        </div>
+
         <!-- Live Boss Statistics Dashboard -->
         <div id="bossStatsCard" class="bg-white rounded-2xl p-4 border border-[#EFE3D3] shadow-xs space-y-3"></div>
 
@@ -294,6 +300,7 @@
       const LINE_OA_KEY = 'hk_crepe_line_oa_v1';
       const GAS_URL_KEY = 'hk_crepe_gas_url_v1';
       const BOSS_KEY = 'hk_crepe_boss_v1';
+      const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbx4bTCMsq_V1KJkU3piaG9ysVbNoLe2hIailpWXSCC08GDSMd7tQtyy_0Mq-xEAxQ1p6w/exec';
 
       const APPS_SCRIPT_CODE = `function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -364,9 +371,10 @@ function doGet(e) {
             localStorage.setItem(GAS_URL_KEY, apiParam.trim());
             return apiParam.trim();
           }
-          return (localStorage.getItem(GAS_URL_KEY) || '').trim();
+          const saved = (localStorage.getItem(GAS_URL_KEY) || '').trim();
+          return saved || DEFAULT_GAS_URL;
         } catch (e) {
-          return '';
+          return DEFAULT_GAS_URL;
         }
       }
 
@@ -1021,19 +1029,17 @@ function doGet(e) {
         showToast(val ? '已綁定 Google 試算表網址' : '已清除試算表綁定');
       });
       document.getElementById('btnCopyCustomerLink').addEventListener('click', () => {
-        const gasUrl = getGasUrl();
         const base = window.location.href.split('?')[0];
-        const shareUrl = gasUrl ? `${base}?api=${encodeURIComponent(gasUrl)}` : base;
-        copyText(shareUrl, '已複製客人點餐網址（無接單管理後台）！');
+        copyText(base, '已複製客人點餐網址（無後台、自動寫入你的試算表）！');
       });
       document.getElementById('btnCopyBossLink').addEventListener('click', () => {
-        const gasUrl = getGasUrl();
         const base = window.location.href.split('?')[0];
-        const bossUrl = gasUrl ? `${base}?boss=1&api=${encodeURIComponent(gasUrl)}` : `${base}?boss=1`;
-        copyText(bossUrl, '已複製老闆專用網址（含接單管理後台）！');
+        copyText(`${base}?boss=1`, '已複製老闆專用網址（含接單管理後台）！');
       });
+      document.getElementById('btnQuickSync').addEventListener('click', () => syncFromSheet(false));
       async function syncFromSheet(silent = false) {
         const gasUrl = getGasUrl();
+        const badge = document.getElementById('cloudBadgeText');
         if (!gasUrl) {
           if (!silent) showToast('請先貼上並綁定 Apps Script 網址');
           return;
@@ -1046,11 +1052,14 @@ function doGet(e) {
             state.orders = data.orders;
             saveState();
             render();
+            const nowStr = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+            if (badge) badge.textContent = `☁️ 已同步雲端 ${data.orders.length} 筆訂單（${nowStr}）`;
             if (!silent) showToast(`已同步 ${data.orders.length} 筆雲端訂單`);
           } else if (!silent) {
             showToast('試算表目前沒有訂單資料');
           }
         } catch (err) {
+          if (badge) badge.textContent = '⚠️ 無法讀取試算表（請確認部署權限為所有人）';
           if (!silent) showToast('無法讀取試算表，請確認部署權限已設為「所有人」');
         }
       }
